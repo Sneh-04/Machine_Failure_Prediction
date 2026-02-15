@@ -1,31 +1,41 @@
-🛠️ Machine Failure Prediction
+# Machine Failure Prediction
 
-📌 Overview
+## Overview
+Predict machine failures using sensor data and machine learning for proactive maintenance. The project includes data analysis, feature engineering, model training, and visualization.
 
-A machine learning project to predict machine failures using sensor data.
-Focuses on data analysis, visualization, and identifying key factors causing failures.
+---
 
-📊 Key Insights
+## Project Contents
+- **data/** – Sensor datasets (`data.csv`, `data (1).csv`)  
+- **machine_failure_model.pkl** – Trained ML model  
+- **Images/** – Visualizations: correlation heatmap, feature importance, sensor histograms  
+- **README.md** – Project documentation  
 
-Sensor distributions analyzed using histograms
+---
 
-Correlation heatmap to study relationships between sensors
+## Requirements
+```bash
+Python 3.8+
+pip install pandas numpy matplotlib seaborn scikit-learn
+Usage
+import pandas as pd
+import pickle
 
-Feature importance to identify critical failure-causing parameters
+# Load data
+df = pd.read_csv('data/data.csv')
 
-🤖 Model
+# Load model
+with open('machine_failure_model.pkl', 'rb') as f:
+    model = pickle.load(f)
 
-Data preprocessing and train–test split
+# Make predictions
+predictions = model.predict(df)
+Notes
+Binary model files may cause merge conflicts; consider using Git LFS.
 
-Machine learning classifier for failure prediction
+Visualizations help understand sensor trends and feature importance.
 
-Model evaluated using accuracy and classification metrics
+Author
+Kunduru Sneha – GitHub | kundurusneha4@gmail.com
 
-🧰 Tech Stack
 
-Python, Pandas, NumPy, Matplotlib, Seaborn, Scikit-learn
-
-👤 Author
-
-Sneha Kunduru
-GitHub: https://github.com/Sneh-04
