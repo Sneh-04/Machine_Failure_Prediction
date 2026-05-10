@@ -485,7 +485,7 @@ with g1:
 
     st.plotly_chart(
         gauge,
-        width='stretch'
+        use_container_width=True
     )
 
 with g2:
@@ -526,7 +526,7 @@ with g2:
 
         st.plotly_chart(
             fig,
-            width='stretch'
+            use_container_width=True
         )
 
 st.markdown("<br>", unsafe_allow_html=True)
@@ -602,7 +602,7 @@ telemetry = pd.DataFrame({
 
 st.dataframe(
     telemetry,
-    width='stretch',
+    use_container_width=True,
     hide_index=True
 )
 
@@ -716,7 +716,7 @@ sankey.update_layout(
 
 st.plotly_chart(
     sankey,
-    width='stretch'
+    use_container_width=True
 )
 
 # ─────────────────────────────────────
@@ -734,7 +734,7 @@ with st.expander("Advanced Analytics"):
 
             st.image(
                 img,
-                width='content'
+                use_container_width=True
             )
 
         else:
@@ -747,7 +747,6 @@ with st.expander("Advanced Analytics"):
 # FOOTER
 # ─────────────────────────────────────
 st.markdown("<br><br>", unsafe_allow_html=True)
-
 
 st.markdown(f"""
 <hr style='border:1px solid rgba(255,255,255,0.06)'>
@@ -769,4 +768,4 @@ GitHub
 </div>
 
 </div>
-""", unsafe_allow_html=True) 
+""", unsafe_allow_html=True)
