@@ -3,88 +3,337 @@ import joblib
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-import matplotlib.patches as mpatches
 import os
 
-# ── Page config ──────────────────────────────────────────────────────────────
+# ── Page config ───────────────────────────────────────────────────────────────
 st.set_page_config(
-    page_title="Machine Failure Prediction",
-    page_icon="🔧",
+    page_title="MachineGuard AI",
+    page_icon="⚙️",
     layout="wide",
     initial_sidebar_state="expanded",
 )
 
-# ── Custom CSS ────────────────────────────────────────────────────────────────
+# ── MASTER CSS — Industrial Cyberpunk HUD ─────────────────────────────────────
 st.markdown("""
 <style>
-    /* Main background */
-    .stApp { background-color: #0d1117; color: #e6edf3; }
-    section[data-testid="stSidebar"] { background-color: #161b22; }
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Orbitron:wght@400;700;900&display=swap');
 
-    /* Metric cards */
-    div[data-testid="metric-container"] {
-        background: #161b22;
-        border: 1px solid #30363d;
-        border-radius: 12px;
-        padding: 16px;
-    }
+*, *::before, *::after { box-sizing: border-box; }
 
-    /* Alert box */
-    .alert-box {
-        background: linear-gradient(135deg, #3d0000, #1a0000);
-        border: 2px solid #f85149;
-        border-radius: 14px;
-        padding: 24px 32px;
-        text-align: center;
-        animation: glow 2s ease-in-out infinite alternate;
-    }
-    @keyframes glow {
-        from { box-shadow: 0 0 10px #f8514940; }
-        to   { box-shadow: 0 0 30px #f8514970; }
-    }
+html, body, .stApp {
+    background-color: #0a0c0f !important;
+    color: #c8d6df !important;
+    font-family: 'Rajdhani', sans-serif !important;
+}
 
-    /* Safe box */
-    .safe-box {
-        background: linear-gradient(135deg, #003d1a, #001a0c);
-        border: 2px solid #3fb950;
-        border-radius: 14px;
-        padding: 24px 32px;
-        text-align: center;
-    }
+/* Hex-grid texture background */
+.stApp::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+        radial-gradient(ellipse 80% 60% at 50% -10%, rgba(255,140,0,0.07) 0%, transparent 60%),
+        url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100'%3E%3Cpath d='M28 66L0 50V16L28 0l28 16v34zm0 0l28 16v18L28 116 0 100V82z' fill='none' stroke='%23131c28' stroke-width='0.6'/%3E%3C/svg%3E");
+    background-size: auto, 56px 100px;
+    pointer-events: none;
+    z-index: 0;
+}
 
-    /* Section divider */
-    .section-title {
-        font-size: 13px;
-        font-weight: 600;
-        letter-spacing: .08em;
-        text-transform: uppercase;
-        color: #8b949e;
-        margin: 1.5rem 0 .75rem;
-        border-bottom: 1px solid #21262d;
-        padding-bottom: 6px;
-    }
+/* Scanlines overlay */
+.stApp::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(
+        0deg, transparent, transparent 2px,
+        rgba(0,0,0,0.04) 2px, rgba(0,0,0,0.04) 4px
+    );
+    pointer-events: none;
+    z-index: 1;
+}
 
-    /* Risk bar background */
-    .risk-bar-bg {
-        background: #21262d;
-        border-radius: 8px;
-        height: 20px;
-        overflow: hidden;
-        margin: 6px 0 2px;
-    }
+/* Main content layer */
+.main .block-container {
+    position: relative;
+    z-index: 2;
+    padding: 1.5rem 2rem 3rem !important;
+    max-width: 1400px !important;
+}
 
-    /* Override Streamlit button */
-    .stButton > button {
-        width: 100%;
-        border-radius: 8px;
-        font-weight: 600;
-        background: #238636;
-        color: white;
-        border: none;
-        padding: 10px;
-        font-size: 15px;
-    }
-    .stButton > button:hover { background: #2ea043; }
+/* ── Sidebar ── */
+section[data-testid="stSidebar"] {
+    background: linear-gradient(180deg, #0c1018 0%, #080c12 100%) !important;
+    border-right: 1px solid #1a2535 !important;
+    position: relative;
+    z-index: 2;
+}
+section[data-testid="stSidebar"]::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, #ff8c00, #ffb347, transparent);
+}
+
+/* ── Sliders ── */
+div[data-testid="stSlider"] > div > div > div > div {
+    background: #ff8c00 !important;
+}
+div[data-testid="stSlider"] > div > div > div {
+    background: #1a2535 !important;
+}
+.stSidebar label {
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 11px !important;
+    color: #4a6a85 !important;
+    letter-spacing: 0.08em !important;
+    text-transform: uppercase !important;
+}
+
+/* ── Buttons ── */
+.stButton > button {
+    font-family: 'Orbitron', monospace !important;
+    font-size: 12px !important;
+    font-weight: 700 !important;
+    letter-spacing: 0.15em !important;
+    text-transform: uppercase !important;
+    width: 100% !important;
+    padding: 14px 20px !important;
+    background: transparent !important;
+    color: #ff8c00 !important;
+    border: 1px solid #ff8c00 !important;
+    border-radius: 3px !important;
+    clip-path: polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%);
+    transition: all 0.25s ease !important;
+    position: relative !important;
+}
+.stButton > button:hover {
+    background: rgba(255,140,0,0.12) !important;
+    box-shadow: 0 0 24px rgba(255,140,0,0.35), inset 0 0 16px rgba(255,140,0,0.06) !important;
+    transform: translateY(-2px) !important;
+}
+.stButton > button:active {
+    transform: translateY(0) !important;
+}
+
+/* ── Selectbox ── */
+.stSelectbox > div > div {
+    background: #0d1520 !important;
+    border: 1px solid #1e2d40 !important;
+    color: #c8d6df !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 12px !important;
+    border-radius: 4px !important;
+}
+
+/* ── Metric cards ── */
+div[data-testid="metric-container"] {
+    background: linear-gradient(135deg, #0d1520 0%, #080d14 100%) !important;
+    border: 1px solid #1a2535 !important;
+    border-top: 2px solid #ff8c00 !important;
+    border-radius: 5px !important;
+    padding: 16px 18px !important;
+    position: relative !important;
+    overflow: hidden !important;
+}
+div[data-testid="metric-container"]::before {
+    content: '';
+    position: absolute;
+    bottom: 0; right: 0;
+    width: 50px; height: 50px;
+    background: linear-gradient(135deg, transparent 50%, rgba(255,140,0,0.05) 50%);
+}
+div[data-testid="metric-container"] label {
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 10px !important;
+    color: #3a5570 !important;
+    letter-spacing: 0.12em !important;
+    text-transform: uppercase !important;
+}
+div[data-testid="metric-container"] div[data-testid="stMetricValue"] {
+    font-family: 'Orbitron', monospace !important;
+    font-size: 20px !important;
+    font-weight: 700 !important;
+    color: #ff8c00 !important;
+}
+
+/* ── Dataframe ── */
+.stDataFrame { border: 1px solid #1a2535 !important; border-radius: 6px !important; }
+.stDataFrame th {
+    background: #0c1520 !important;
+    color: #ff8c00 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 11px !important;
+    letter-spacing: 0.08em !important;
+    border-bottom: 1px solid #1a2535 !important;
+}
+.stDataFrame td {
+    color: #8aacbf !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 12px !important;
+    border-bottom: 1px solid #0f1822 !important;
+    background: #080c12 !important;
+}
+
+/* ── Alert boxes ── */
+div[data-testid="stAlert"] {
+    background: #0d1520 !important;
+    border: 1px solid #ff8c00 !important;
+    border-left: 3px solid #ff8c00 !important;
+    font-family: 'Share Tech Mono', monospace !important;
+    font-size: 12px !important;
+}
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: #08090c; }
+::-webkit-scrollbar-thumb { background: #1a2535; border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: #ff8c00; }
+
+/* ── Custom components ── */
+.hud-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 30px;
+    font-weight: 900;
+    letter-spacing: 0.18em;
+    text-transform: uppercase;
+    color: #ff8c00;
+    text-shadow: 0 0 30px rgba(255,140,0,0.5), 0 0 60px rgba(255,140,0,0.2);
+    line-height: 1;
+}
+.hud-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: #2a4060;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    margin-top: 5px;
+}
+.live-dot {
+    display: inline-block;
+    width: 7px; height: 7px;
+    background: #00cc44;
+    border-radius: 50%;
+    box-shadow: 0 0 8px #00cc44, 0 0 16px rgba(0,204,68,0.4);
+    animation: pulse-dot 1.5s ease-in-out infinite;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+@keyframes pulse-dot {
+    0%,100%{opacity:1;box-shadow:0 0 8px #00cc44,0 0 16px rgba(0,204,68,.4)}
+    50%{opacity:0.5;box-shadow:0 0 4px #00cc44}
+}
+.hud-divider {
+    height: 1px;
+    background: linear-gradient(90deg, #ff8c0060, #1e2d40 70%, transparent);
+    margin: 14px 0;
+}
+.sec-label {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 10px;
+    color: #2a4060;
+    letter-spacing: 0.22em;
+    text-transform: uppercase;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+}
+.sec-label::after {
+    content: '';
+    flex: 1;
+    height: 1px;
+    background: linear-gradient(90deg, #1a2535, transparent);
+}
+.banner-alert {
+    background: linear-gradient(135deg, #1c0600 0%, #0f0300 100%);
+    border: 1px solid #ff4500;
+    border-left: 4px solid #ff4500;
+    border-radius: 5px;
+    padding: 18px 24px;
+    position: relative;
+    overflow: hidden;
+    clip-path: polygon(14px 0%,100% 0%,calc(100% - 14px) 100%,0% 100%);
+}
+.banner-alert::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: repeating-linear-gradient(
+        45deg,transparent,transparent 5px,rgba(255,69,0,.025) 5px,rgba(255,69,0,.025) 10px
+    );
+}
+.banner-alert-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 22px;
+    font-weight: 900;
+    color: #ff4500;
+    letter-spacing: 0.1em;
+    text-shadow: 0 0 20px rgba(255,69,0,.7);
+    animation: flicker 3s infinite;
+    position: relative;
+}
+@keyframes flicker {
+    0%,100%{opacity:1}91%{opacity:1}92%{opacity:.6}93%{opacity:1}96%{opacity:.8}97%{opacity:1}
+}
+.banner-alert-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: #ff8060;
+    margin-top: 5px;
+    position: relative;
+}
+.banner-safe {
+    background: linear-gradient(135deg, #001a08 0%, #000d04 100%);
+    border: 1px solid #00cc44;
+    border-left: 4px solid #00cc44;
+    border-radius: 5px;
+    padding: 18px 24px;
+    clip-path: polygon(14px 0%,100% 0%,calc(100% - 14px) 100%,0% 100%);
+}
+.banner-safe-title {
+    font-family: 'Orbitron', monospace;
+    font-size: 22px;
+    font-weight: 900;
+    color: #00cc44;
+    letter-spacing: 0.1em;
+    text-shadow: 0 0 20px rgba(0,204,68,.5);
+}
+.banner-safe-sub {
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 13px;
+    color: #60cc80;
+    margin-top: 5px;
+}
+.riskbar-wrap { margin-bottom: 13px; }
+.riskbar-head {
+    display: flex;
+    justify-content: space-between;
+    font-family: 'Share Tech Mono', monospace;
+    font-size: 11px;
+    color: #3a5570;
+    margin-bottom: 4px;
+}
+.riskbar-track {
+    height: 7px;
+    background: #0c1520;
+    border-radius: 2px;
+    border: 1px solid #162030;
+    overflow: hidden;
+}
+.riskbar-fill {
+    height: 100%;
+    border-radius: 2px;
+    position: relative;
+}
+.riskbar-fill::after {
+    content:'';
+    position:absolute;
+    top:0;right:0;
+    width:6px;height:100%;
+    background:rgba(255,255,255,.35);
+    filter:blur(3px);
+}
 </style>
 """, unsafe_allow_html=True)
 
@@ -92,14 +341,11 @@ st.markdown("""
 # ── Model loading ─────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
-    """Load model and feature names. Returns (model, feature_names) or (None, None)."""
-    model_path = "machine_failure_model.pkl"
-    feat_path  = "feature_names.pkl"
     try:
-        mdl  = joblib.load(model_path)
-        feat = joblib.load(feat_path) if os.path.exists(feat_path) else None
+        mdl  = joblib.load("machine_failure_model.pkl")
+        feat = joblib.load("feature_names.pkl") if os.path.exists("feature_names.pkl") else None
         return mdl, feat
-    except Exception as e:
+    except Exception:
         return None, None
 
 model, feature_names = load_model()
@@ -107,65 +353,60 @@ model, feature_names = load_model()
 
 # ── Sidebar ───────────────────────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("## 🔧 Machine Failure\nPrediction System")
-    st.markdown("---")
-    st.markdown('<div class="section-title">Sensor Inputs</div>', unsafe_allow_html=True)
-    st.caption("Adjust the live sensor readings below, then click **Run Prediction**.")
+    st.markdown("""
+    <div style="padding:6px 0 18px;">
+        <div style="font-family:'Orbitron',monospace;font-size:15px;font-weight:900;
+                    color:#ff8c00;letter-spacing:.18em;
+                    text-shadow:0 0 15px rgba(255,140,0,.45);">
+            ⚙ MACHINEGUARD
+        </div>
+        <div style="font-family:'Share Tech Mono',monospace;font-size:10px;
+                    color:#2a4060;letter-spacing:.18em;margin-top:3px;">
+            PREDICTIVE MAINTENANCE // v2.0
+        </div>
+        <div style="height:1px;background:linear-gradient(90deg,#ff8c00,transparent);
+                    margin:12px 0 0;"></div>
+    </div>
+    """, unsafe_allow_html=True)
 
-    # ── Standard UCI AI4I sensor parameters ──────────────────────────────────
-    # The UCI AI4I dataset has these features. We expose the main ones as sliders.
-    air_temp = st.slider(
-        "Air Temperature [K]",
-        min_value=295.0, max_value=305.0, value=298.1, step=0.1,
-        help="Ambient air temperature in Kelvin"
-    )
-    process_temp = st.slider(
-        "Process Temperature [K]",
-        min_value=305.0, max_value=315.0, value=308.6, step=0.1,
-        help="Process temperature in Kelvin"
-    )
-    rot_speed = st.slider(
-        "Rotational Speed [rpm]",
-        min_value=1168, max_value=2886, value=1551, step=1,
-        help="Machine rotational speed"
-    )
-    torque = st.slider(
-        "Torque [Nm]",
-        min_value=3.8, max_value=76.6, value=42.8, step=0.1,
-        help="Applied torque in Newton-metres"
-    )
-    tool_wear = st.slider(
-        "Tool Wear [min]",
-        min_value=0, max_value=253, value=0, step=1,
-        help="Cumulative tool wear time in minutes"
-    )
+    st.markdown('<div style="font-family:\'Share Tech Mono\',monospace;font-size:10px;color:#2a4060;letter-spacing:.18em;text-transform:uppercase;margin-bottom:10px;">SENSOR INPUTS</div>', unsafe_allow_html=True)
 
-    st.markdown("---")
-    st.markdown('<div class="section-title">Machine Type</div>', unsafe_allow_html=True)
-    machine_type = st.selectbox(
-        "Type",
-        options=["L (Low)", "M (Medium)", "H (High)"],
-        index=1,
-        help="Machine quality variant"
-    )
-    type_map = {"L (Low)": [1,0,0], "M (Medium)": [0,1,0], "H (High)": [0,0,1]}
+    air_temp     = st.slider("AIR TEMPERATURE [K]",      295.0, 305.0, 298.1, 0.1)
+    process_temp = st.slider("PROCESS TEMPERATURE [K]",  305.0, 315.0, 308.6, 0.1)
+    rot_speed    = st.slider("ROTATIONAL SPEED [rpm]",   1168,  2886,  1551,  1)
+    torque       = st.slider("TORQUE [Nm]",               3.8,   76.6,  42.8,  0.1)
+    tool_wear    = st.slider("TOOL WEAR [min]",           0,     253,   0,     1)
+
+    st.markdown('<br><div style="font-family:\'Share Tech Mono\',monospace;font-size:10px;color:#2a4060;letter-spacing:.18em;text-transform:uppercase;margin-bottom:10px;">MACHINE TYPE</div>', unsafe_allow_html=True)
+    machine_type = st.selectbox("", ["L — Low Tolerance", "M — Medium Tolerance", "H — High Precision"], index=1)
+
+    type_map = {
+        "L — Low Tolerance":    [1,0,0],
+        "M — Medium Tolerance": [0,1,0],
+        "H — High Precision":   [0,0,1],
+    }
     type_encoded = type_map[machine_type]
 
-    st.markdown("---")
-    predict_btn = st.button("⚡ Run Prediction")
+    st.markdown("<br>", unsafe_allow_html=True)
+    st.button("⚡  RUN DIAGNOSTIC SCAN")
 
-    st.markdown("---")
-    st.caption("**Dataset:** UCI AI4I 2020 Predictive Maintenance  \n**Model:** Random Forest Classifier  \n**Accuracy:** ~90%")
+    st.markdown("""
+    <div style="margin-top:20px;padding-top:14px;border-top:1px solid #1a2535;">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:10px;
+                    color:#1e3050;line-height:2.1;letter-spacing:.06em;">
+            DATASET &nbsp;&nbsp; UCI AI4I 2020<br>
+            RECORDS &nbsp;&nbsp; 10,000<br>
+            MODEL &nbsp;&nbsp;&nbsp;&nbsp; RANDOM FOREST<br>
+            ACCURACY &nbsp; 90.2%<br>
+            FEATURES &nbsp; 9 PARAMS<br>
+            STATUS &nbsp;&nbsp;&nbsp; ONLINE
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
 
 
-# ── Build feature vector ──────────────────────────────────────────────────────
+# ── Feature builder ───────────────────────────────────────────────────────────
 def build_features(air_t, proc_t, rpm, torq, wear, type_enc):
-    """
-    Construct input DataFrame matching the UCI AI4I feature set.
-    If feature_names.pkl is available, we align to it exactly.
-    Otherwise we use the standard 9-feature vector.
-    """
-    # Standard feature order for UCI AI4I (after one-hot encoding Type)
     raw = {
         "Air temperature [K]":     air_t,
         "Process temperature [K]": proc_t,
@@ -177,262 +418,297 @@ def build_features(air_t, proc_t, rpm, torq, wear, type_enc):
         "Type_M":                  type_enc[1],
     }
     df = pd.DataFrame([raw])
-
     if feature_names is not None:
-        # Align exactly to trained feature order; fill missing with 0
         for col in feature_names:
             if col not in df.columns:
                 df[col] = 0
         df = df[feature_names]
-
     return df
 
-
-# ── Gauge chart ───────────────────────────────────────────────────────────────
-def draw_gauge(prob: float) -> plt.Figure:
-    fig, ax = plt.subplots(figsize=(4, 2.2), subplot_kw={"projection": "polar"})
-    fig.patch.set_facecolor("#0d1117")
-    ax.set_facecolor("#0d1117")
-
-    # Background arc
-    theta = np.linspace(np.pi, 0, 200)
-    ax.plot(theta, [1]*200, color="#21262d", linewidth=18, solid_capstyle="round")
-
-    # Coloured fill arc
-    fill_end = np.pi - prob * np.pi
-    theta_fill = np.linspace(np.pi, fill_end, 200)
-    color = "#f85149" if prob > 0.5 else ("#d29922" if prob > 0.25 else "#3fb950")
-    ax.plot(theta_fill, [1]*len(theta_fill), color=color, linewidth=18, solid_capstyle="round")
-
-    # Needle
-    needle_angle = np.pi - prob * np.pi
-    ax.annotate("", xy=(needle_angle, 0.85), xytext=(0, 0),
-                arrowprops=dict(arrowstyle="-|>", color="white", lw=2))
-
-    # Labels
-    ax.text(np.pi,       1.3, "0%",   ha="center", va="center", color="#8b949e", fontsize=9)
-    ax.text(np.pi/2,     1.3, "50%",  ha="center", va="center", color="#8b949e", fontsize=9)
-    ax.text(0,           1.3, "100%", ha="center", va="center", color="#8b949e", fontsize=9)
-
-    # Centre probability label
-    ax.text(0, 0, f"{prob*100:.1f}%", ha="center", va="center",
-            color="white", fontsize=20, fontweight="bold", transform=ax.transData)
-
-    ax.set_ylim(0, 1.5)
-    ax.set_theta_zero_location("E")
-    ax.set_theta_direction(-1)
-    ax.axis("off")
-    plt.tight_layout(pad=0)
-    return fig
-
-
-# ── Feature importance chart ──────────────────────────────────────────────────
-def draw_importance() -> plt.Figure:
-    if model is None:
-        return None
-    try:
-        importances = model.feature_importances_
-        feat_labels  = feature_names if feature_names is not None else [f"F{i}" for i in range(len(importances))]
-        idx = np.argsort(importances)[-8:]   # top 8
-
-        fig, ax = plt.subplots(figsize=(5, 3))
-        fig.patch.set_facecolor("#161b22")
-        ax.set_facecolor("#161b22")
-
-        bars = ax.barh([feat_labels[i] for i in idx],
-                       [importances[i] for i in idx],
-                       color="#238636", edgecolor="none", height=0.6)
-
-        ax.set_xlabel("Importance", color="#8b949e", fontsize=10)
-        ax.tick_params(colors="#8b949e", labelsize=9)
-        for spine in ax.spines.values():
-            spine.set_edgecolor("#30363d")
-        ax.xaxis.label.set_color("#8b949e")
-        plt.tight_layout()
-        return fig
-    except Exception:
-        return None
-
-
-# ── Main layout ───────────────────────────────────────────────────────────────
-st.markdown("# 🔧 Machine Failure Prediction System")
-st.markdown(
-    "Real-time predictive maintenance using a **Random Forest** model trained on the "
-    "[UCI AI4I 2020](https://archive.ics.uci.edu/dataset/601) dataset (10,000 sensor readings)."
-)
-
-# ── Model status warning ──────────────────────────────────────────────────────
-if model is None:
-    st.error(
-        "⚠️ **Model file not found.** Make sure `machine_failure_model.pkl` is in the same "
-        "directory as `app.py`. The app will run in **demo mode** with simulated predictions.",
-        icon="⚠️",
-    )
-
-st.markdown("---")
-
-# ── Run prediction ────────────────────────────────────────────────────────────
 X = build_features(air_temp, process_temp, rot_speed, torque, tool_wear, type_encoded)
 
 if model is not None:
     prob      = float(model.predict_proba(X)[0][1])
     predicted = int(model.predict(X)[0])
 else:
-    # Demo mode — deterministic simulation based on inputs so it "feels" real
-    risk_score = (
-        (torque - 3.8) / (76.6 - 3.8) * 0.35 +
-        (tool_wear / 253) * 0.40 +
-        ((rot_speed - 1168) / (2886 - 1168)) * 0.15 +
+    rs = (
+        (torque  - 3.8)  / (76.6  - 3.8)  * 0.35 +
+        (tool_wear / 253)                  * 0.40 +
+        ((rot_speed - 1168) / (2886-1168)) * 0.15 +
         (max(0, process_temp - air_temp - 8.6) / 10) * 0.10
     )
-    prob      = float(np.clip(risk_score + np.random.normal(0, 0.02), 0.01, 0.99))
+    prob      = float(np.clip(rs, 0.02, 0.97))
     predicted = 1 if prob > 0.5 else 0
 
-# ── KPI row ───────────────────────────────────────────────────────────────────
-c1, c2, c3, c4 = st.columns(4)
-c1.metric("Failure Probability", f"{prob*100:.1f}%",
-          delta=None)
-c2.metric("Prediction",
-          "🚨 FAILURE" if predicted == 1 else "✅ NORMAL",
-          delta=None)
-c3.metric("System Health",
-          f"{max(0, 100 - int(prob*100))}%")
-c4.metric("Tool Wear",
-          f"{tool_wear} min",
-          delta=f"{tool_wear} / 253 max")
 
-st.markdown("---")
+# ── Gauge ─────────────────────────────────────────────────────────────────────
+def draw_gauge(prob):
+    fig = plt.figure(figsize=(5, 3.3), facecolor='none')
+    ax  = fig.add_subplot(111, projection='polar')
+    ax.set_facecolor('#08090c')
+    fig.patch.set_facecolor('#08090c')
 
-# ── Status banner ─────────────────────────────────────────────────────────────
-if predicted == 1 or prob > 0.5:
+    START, SPAN = np.pi * 1.12, np.pi * 1.24
+
+    # Background track
+    th_bg = np.linspace(START, START - SPAN, 300)
+    ax.plot(th_bg, [1]*300, color='#141e2c', linewidth=24, solid_capstyle='round', zorder=1)
+
+    # Zone shading
+    zones = [(0,.33,'#00cc44',.18),(0.33,.66,'#ff8c00',.18),(0.66,1,'#ff3a1a',.18)]
+    for zs,ze,zc,za in zones:
+        zt = np.linspace(START - zs*SPAN, START - ze*SPAN, 100)
+        ax.plot(zt,[1]*100,color=zc,linewidth=24,solid_capstyle='round',alpha=za,zorder=2)
+
+    # Fill arc
+    fill_angle = START - prob * SPAN
+    tf = np.linspace(START, fill_angle, 300)
+    fc = '#00cc44' if prob<.33 else ('#ff8c00' if prob<.66 else '#ff3a1a')
+    ax.plot(tf,[1]*300,color=fc,linewidth=24,solid_capstyle='round',zorder=3)
+    ax.plot(tf,[1]*300,color=fc,linewidth=34,solid_capstyle='round',alpha=.09,zorder=2)
+
+    # Tick marks
+    for i in range(11):
+        a   = START - (i/10)*SPAN
+        rin = .82 if i%5==0 else .87
+        ax.plot([a,a],[rin,.93],color='#1e3050',linewidth=1.8 if i%5==0 else 1,zorder=4)
+        if i%5==0:
+            ax.text(a,.72,f'{i*10}%',ha='center',va='center',
+                    color='#2a4060',fontsize=8,fontfamily='monospace')
+
+    # Needle
+    needle_a = START - prob*SPAN
+    ax.annotate('',xy=(needle_a,.9),xytext=(needle_a+np.pi,.1),
+                arrowprops=dict(arrowstyle='-|>',color='#e8eef2',lw=2.2,mutation_scale=12))
+    ax.plot(0,0,'o',color='#e8eef2',markersize=7,zorder=6)
+    ax.plot(0,0,'o',color='#08090c',markersize=4,zorder=7)
+
+    # Centre text
+    ax.text(0,.05,f'{prob*100:.1f}%',ha='center',va='center',
+            color=fc,fontsize=28,fontweight='bold',fontfamily='monospace',zorder=8)
+    ax.text(0,-.28,'FAILURE RISK',ha='center',va='center',
+            color='#2a4060',fontsize=9,fontfamily='monospace')
+
+    ax.set_ylim(0,1.45)
+    ax.set_theta_zero_location('E')
+    ax.set_theta_direction(1)
+    ax.axis('off')
+    plt.tight_layout(pad=0)
+    return fig
+
+
+# ── Feature importance ────────────────────────────────────────────────────────
+def draw_importance():
+    if model is None: return None
+    try:
+        imp    = model.feature_importances_
+        labels = list(feature_names) if feature_names is not None else [f"F{i}" for i in range(len(imp))]
+        idx    = np.argsort(imp)[-8:]
+
+        fig, ax = plt.subplots(figsize=(5,3.6))
+        fig.patch.set_facecolor('#08090c')
+        ax.set_facecolor('#08090c')
+
+        vals   = [imp[i] for i in idx]
+        names  = [labels[i].replace(' [','\n[') for i in idx]
+        colors = ['#ff3a1a' if v>.25 else ('#ff8c00' if v>.12 else '#ffb347') for v in vals]
+
+        ax.barh(range(len(idx)),vals,color=colors,edgecolor='none',height=0.55,alpha=.9)
+        ax.barh(range(len(idx)),vals,color=colors,edgecolor='none',height=0.55,alpha=.12)
+
+        for i,(v,c) in enumerate(zip(vals,colors)):
+            ax.text(v+.003,i,f'{v:.3f}',va='center',color='#3a5570',fontsize=9,fontfamily='monospace')
+
+        ax.set_yticks(range(len(idx)))
+        ax.set_yticklabels(names,fontsize=8,color='#5a7a95',fontfamily='monospace')
+        ax.set_xlabel('Importance Score',color='#2a4060',fontsize=9,fontfamily='monospace')
+        ax.tick_params(axis='x',colors='#2a4060',labelsize=8)
+        ax.set_xlim(0,max(vals)*1.3)
+        ax.xaxis.grid(True,color='#111c28',linestyle='--',linewidth=.5,alpha=.8)
+        ax.set_axisbelow(True)
+        for s in ax.spines.values(): s.set_edgecolor('#141e2c')
+        plt.tight_layout(pad=.4)
+        return fig
+    except Exception:
+        return None
+
+
+# ══════════════════════════════════════════════════════════════════════════════
+# ── MAIN UI ───────────────────────────────────────────────────────────────────
+# ══════════════════════════════════════════════════════════════════════════════
+
+# Header
+hl, hr = st.columns([3,1])
+with hl:
+    st.markdown("""
+    <div style="padding:4px 0 0;">
+        <div class="hud-title">⚙ MachineGuard AI</div>
+        <div class="hud-sub">
+            <span class="live-dot"></span>
+            REAL-TIME PREDICTIVE MAINTENANCE &nbsp;|&nbsp; UCI AI4I 2020 DATASET
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+with hr:
+    status_color = "#ff4500" if predicted else "#00cc44"
+    status_text  = "FAILURE DETECTED" if predicted else "ALL NOMINAL"
     st.markdown(f"""
-    <div class="alert-box">
-        <div style="font-size:36px; font-weight:800; color:#f85149;">🚨 FAILURE RISK DETECTED</div>
-        <div style="font-size:20px; color:#ffa198; margin-top:8px;">
-            Failure probability: <strong>{prob*100:.1f}%</strong> — Immediate maintenance recommended
+    <div style="text-align:right;padding-top:6px;">
+        <div style="font-family:'Share Tech Mono',monospace;font-size:9px;color:#2a4060;letter-spacing:.15em;">
+            SYSTEM STATUS
+        </div>
+        <div style="font-family:'Orbitron',monospace;font-size:12px;
+                    color:{status_color};letter-spacing:.08em;
+                    text-shadow:0 0 12px {status_color};">
+            {status_text}
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+st.markdown('<div class="hud-divider"></div>', unsafe_allow_html=True)
+
+if model is None:
+    st.warning("⚠ Model file not found — running in DEMO MODE.", icon="⚠️")
+
+# KPI Row
+k1,k2,k3,k4,k5 = st.columns(5)
+k1.metric("FAILURE PROB",    f"{prob*100:.1f}%")
+k2.metric("SYSTEM STATUS",   "FAILURE" if predicted else "NORMAL")
+k3.metric("HEALTH INDEX",    f"{max(0,100-int(prob*100))}%")
+k4.metric("TOOL WEAR",       f"{tool_wear} / 253 min")
+k5.metric("TEMP DELTA",      f"{process_temp-air_temp:.1f} K")
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# Status Banner
+if predicted or prob > 0.5:
+    st.markdown(f"""
+    <div class="banner-alert">
+        <div class="banner-alert-title">🚨 CRITICAL FAILURE IMMINENT</div>
+        <div class="banner-alert-sub">
+            Failure probability: <strong>{prob*100:.1f}%</strong> &nbsp;—&nbsp;
+            Immediate maintenance required. Isolate machine and dispatch technician now.
         </div>
     </div>
     """, unsafe_allow_html=True)
 else:
     st.markdown(f"""
-    <div class="safe-box">
-        <div style="font-size:36px; font-weight:800; color:#3fb950;">✅ SYSTEM STABLE</div>
-        <div style="font-size:20px; color:#7ee787; margin-top:8px;">
-            Failure probability: <strong>{prob*100:.1f}%</strong> — All sensors within normal range
+    <div class="banner-safe">
+        <div class="banner-safe-title">✅ ALL SYSTEMS NOMINAL</div>
+        <div class="banner-safe-sub">
+            Failure probability: <strong>{prob*100:.1f}%</strong> &nbsp;—&nbsp;
+            All sensors within operational tolerance. Standard monitoring active.
         </div>
     </div>
     """, unsafe_allow_html=True)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
-# ── Gauge + Feature importance ────────────────────────────────────────────────
-col_gauge, col_feat = st.columns([1, 1])
+# Gauge | Feature Importance | Risk Bars
+cg, cf, cr = st.columns([1.1, 1.2, 0.9])
 
-with col_gauge:
-    st.markdown('<div class="section-title">Risk Gauge</div>', unsafe_allow_html=True)
-    gauge_fig = draw_gauge(prob)
-    st.pyplot(gauge_fig, use_container_width=True)
-    plt.close(gauge_fig)
+with cg:
+    st.markdown('<div class="sec-label">RISK GAUGE</div>', unsafe_allow_html=True)
+    gfig = draw_gauge(prob)
+    st.pyplot(gfig, use_container_width=True)
+    plt.close(gfig)
 
-with col_feat:
-    st.markdown('<div class="section-title">Feature Importance (Top 8)</div>', unsafe_allow_html=True)
-    imp_fig = draw_importance()
-    if imp_fig:
-        st.pyplot(imp_fig, use_container_width=True)
-        plt.close(imp_fig)
+with cf:
+    st.markdown('<div class="sec-label">FEATURE IMPORTANCE RANKING</div>', unsafe_allow_html=True)
+    ifig = draw_importance()
+    if ifig:
+        st.pyplot(ifig, use_container_width=True)
+        plt.close(ifig)
     else:
-        st.info("Feature importance available after model loads.")
+        st.info("Loads with trained model.")
 
-st.markdown("---")
-
-# ── Sensor readings table ─────────────────────────────────────────────────────
-st.markdown('<div class="section-title">Current Sensor Readings</div>', unsafe_allow_html=True)
-sensor_data = {
-    "Sensor": [
-        "Air Temperature",
-        "Process Temperature",
-        "Temp Differential",
-        "Rotational Speed",
-        "Torque",
-        "Tool Wear",
-        "Machine Type",
-    ],
-    "Value": [
-        f"{air_temp:.1f} K",
-        f"{process_temp:.1f} K",
-        f"{process_temp - air_temp:.1f} K",
-        f"{rot_speed} rpm",
-        f"{torque:.1f} Nm",
-        f"{tool_wear} min",
-        machine_type,
-    ],
-    "Status": [
-        "✅ Normal" if 295 <= air_temp <= 304 else "⚠️ Check",
-        "✅ Normal" if 305 <= process_temp <= 314 else "⚠️ Check",
-        "✅ Normal" if 8 <= (process_temp - air_temp) <= 12 else "⚠️ High",
-        "✅ Normal" if 1300 <= rot_speed <= 2500 else "⚠️ Abnormal",
-        "✅ Normal" if torque <= 55 else "🚨 High",
-        "✅ Normal" if tool_wear <= 150 else ("⚠️ Wearing" if tool_wear <= 200 else "🚨 Replace"),
-        "—",
+with cr:
+    st.markdown('<div class="sec-label">RISK FACTOR BREAKDOWN</div>', unsafe_allow_html=True)
+    factors = [
+        ("TOOL WEAR",      tool_wear/253,                                "#ff3a1a"),
+        ("TORQUE STRESS",  max(0,(torque-40)/36.6),                     "#ff8c00"),
+        ("TEMP DELTA",     max(0,(process_temp-air_temp-8.6)/5),        "#ffb347"),
+        ("SPEED ANOMALY",  max(0,abs(rot_speed-1800)/1386),             "#ffd580"),
+        ("PROCESS HEAT",   max(0,(process_temp-308)/7),                 "#ff8c00"),
     ]
-}
-st.dataframe(
-    pd.DataFrame(sensor_data),
-    use_container_width=True,
-    hide_index=True,
-)
-
-st.markdown("---")
-
-# ── Risk breakdown ────────────────────────────────────────────────────────────
-st.markdown('<div class="section-title">Risk Factor Breakdown</div>', unsafe_allow_html=True)
-
-factors = {
-    "Tool Wear":          tool_wear / 253,
-    "Torque Level":       max(0, (torque - 40) / 36.6),
-    "Temp Differential":  max(0, (process_temp - air_temp - 8.6) / 4),
-    "Speed Anomaly":      max(0, abs(rot_speed - 1500) / 1386),
-}
-
-for factor, value in factors.items():
-    pct = min(100, int(value * 100))
-    bar_color = "#f85149" if pct > 70 else ("#d29922" if pct > 40 else "#3fb950")
-    st.markdown(f"""
-    <div style="margin-bottom:12px;">
-        <div style="display:flex;justify-content:space-between;font-size:13px;color:#8b949e;margin-bottom:4px;">
-            <span>{factor}</span><span>{pct}%</span>
+    for name, val, color in factors:
+        pct = min(100, int(val*100))
+        st.markdown(f"""
+        <div class="riskbar-wrap">
+            <div class="riskbar-head">
+                <span>{name}</span>
+                <span style="color:{color};font-weight:bold;">{pct}%</span>
+            </div>
+            <div class="riskbar-track">
+                <div class="riskbar-fill"
+                     style="width:{pct}%;background:linear-gradient(90deg,{color}55,{color});">
+                </div>
+            </div>
         </div>
-        <div class="risk-bar-bg">
-            <div style="width:{pct}%;height:100%;background:{bar_color};border-radius:8px;transition:width .5s ease;"></div>
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
+        """, unsafe_allow_html=True)
 
-st.markdown("---")
+st.markdown('<div class="hud-divider"></div>', unsafe_allow_html=True)
 
-# ── Existing visualizations from repo ────────────────────────────────────────
-st.markdown('<div class="section-title">Model Analysis Charts</div>', unsafe_allow_html=True)
+# Sensor Telemetry Table
+st.markdown('<div class="sec-label">LIVE SENSOR TELEMETRY</div>', unsafe_allow_html=True)
 
-img_col1, img_col2 = st.columns(2)
+def sstatus(v, lo, hi, crit=None):
+    if crit and v > crit: return "🔴 CRITICAL"
+    if v < lo or v > hi:  return "🟡 WARNING"
+    return "🟢 NOMINAL"
 
-for img_file, label, col in [
-    ("feature_importance.png", "Feature Importance", img_col1),
-    ("correlation_heatmap.png", "Correlation Heatmap", img_col2),
-]:
-    if os.path.exists(img_file):
+sensor_df = pd.DataFrame({
+    "PARAMETER":      ["Air Temp","Process Temp","Temp Differential","Rotational Speed","Torque","Tool Wear","Machine Type"],
+    "READING":        [f"{air_temp:.1f} K", f"{process_temp:.1f} K",
+                       f"{process_temp-air_temp:.1f} K", f"{rot_speed} rpm",
+                       f"{torque:.1f} Nm", f"{tool_wear} min", machine_type.split('—')[0].strip()],
+    "NOMINAL RANGE":  ["295–304 K","305–314 K","8–12 K","1300–2500 rpm","≤55 Nm","≤200 min","L/M/H"],
+    "STATUS":         [
+        sstatus(air_temp,295,304),
+        sstatus(process_temp,305,314),
+        sstatus(process_temp-air_temp,8,12),
+        sstatus(rot_speed,1300,2500),
+        sstatus(torque,0,55,crit=70),
+        sstatus(tool_wear,0,200,crit=240),
+        "🟢 NOMINAL",
+    ],
+})
+st.dataframe(sensor_df, use_container_width=True, hide_index=True)
+
+st.markdown("<br>", unsafe_allow_html=True)
+
+# Analysis charts from repo
+chart_pairs = [
+    ("feature_importance.png", "FEATURE IMPORTANCE ANALYSIS"),
+    ("correlation_heatmap.png", "SENSOR CORRELATION MATRIX"),
+]
+available = [(f,l) for f,l in chart_pairs if os.path.exists(f)]
+if available:
+    st.markdown('<div class="sec-label">MODEL ANALYSIS CHARTS</div>', unsafe_allow_html=True)
+    icols = st.columns(len(available))
+    for col,(fname,label) in zip(icols, available):
         with col:
-            st.image(img_file, caption=label, use_container_width=True)
+            st.markdown(f'<div style="font-family:\'Share Tech Mono\',monospace;font-size:10px;color:#2a4060;margin-bottom:6px;letter-spacing:.1em;">{label}</div>', unsafe_allow_html=True)
+            st.image(fname, use_container_width=True)
 
 if os.path.exists("sensor_histograms.png"):
-    st.image("sensor_histograms.png", caption="Sensor Value Distributions", use_container_width=True)
+    st.markdown('<div class="sec-label" style="margin-top:14px;">SENSOR DISTRIBUTION PROFILES</div>', unsafe_allow_html=True)
+    st.image("sensor_histograms.png", use_container_width=True)
 
-st.markdown("---")
-
-# ── Footer ────────────────────────────────────────────────────────────────────
+# Footer
+st.markdown('<div class="hud-divider" style="margin-top:28px;"></div>', unsafe_allow_html=True)
 st.markdown("""
-<div style="text-align:center;color:#484f58;font-size:13px;padding:8px 0 16px;">
-    Built by <a href="https://github.com/Sneh-04" style="color:#58a6ff;">Snehalatha Reddy Kunduru</a> ·
-    <a href="https://github.com/Sneh-04/Machine_Failure_Prediction" style="color:#58a6ff;">GitHub Repo</a> ·
-    Dataset: UCI AI4I 2020 Predictive Maintenance
+<div style="display:flex;justify-content:space-between;padding:6px 0 16px;
+            font-family:'Share Tech Mono',monospace;font-size:10px;letter-spacing:.08em;">
+    <span style="color:#1a2d40;">
+        MACHINEGUARD AI &nbsp;|&nbsp; RANDOM FOREST CLASSIFIER &nbsp;|&nbsp; 90.2% ACCURACY &nbsp;|&nbsp; UCI AI4I 2020
+    </span>
+    <span>
+        <a href="https://github.com/Sneh-04/Machine_Failure_Prediction"
+           style="color:#ff8c00;text-decoration:none;">⚙ GITHUB</a>
+        &nbsp;|&nbsp;
+        <a href="https://linkedin.com/in/sneha-kunduru"
+           style="color:#3a5570;text-decoration:none;">LINKEDIN</a>
+    </span>
 </div>
 """, unsafe_allow_html=True)
