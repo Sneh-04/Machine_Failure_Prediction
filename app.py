@@ -1,772 +1,247 @@
-# ================================
-# MACHINEGUARD AI — FINAL CLEAN VERSION
-# ================================
- 
 import streamlit as st
-import pandas as pd
-import numpy as np
-import plotly.graph_objects as go
-import plotly.express as px
 import joblib
+import numpy as np
+import pandas as pd
 import os
-import json
- 
-# ─────────────────────────────────────
-# PAGE CONFIG
-# ─────────────────────────────────────
-st.set_page_config(
-    page_title="MachineGuard AI",
-    page_icon="⚙️",
-    layout="wide"
-)
- 
-# ─────────────────────────────────────
-# COLORS
-# ─────────────────────────────────────
-PRIMARY = "#00E0FF"
-WARNING = "#FF8C42"
-DANGER  = "#FF4D4D"
-SUCCESS = "#00D26A"
- 
-BG      = "#0B0F14"
-CARD    = "#121821"
-TEXT    = "#D6E2F0"
- 
-# ─────────────────────────────────────
-# CUSTOM CSS
-# ─────────────────────────────────────
-st.markdown(f"""
+
+st.set_page_config(layout="wide", page_title="AI Predictive Maintenance")
+
+st.markdown("""
 <style>
- 
-@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@500;700;900&family=Inter:wght@300;400;500;600;700&display=swap');
- 
-html, body, .stApp {{
-    background:
-        radial-gradient(circle at top right,
-        rgba(0,224,255,0.06),
-        transparent 30%),
-        {BG};
- 
-    color: {TEXT};
-    font-family: 'Inter', sans-serif;
-}}
- 
-.block-container {{
-    max-width: 1450px;
-    padding-top: 1.8rem;
-}}
- 
-section[data-testid="stSidebar"] {{
-    background: #10161F;
-    border-right: 1px solid rgba(255,255,255,0.05);
-}}
- 
-.metric-card {{
-    background: rgba(18,24,33,0.88);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 18px;
-    padding: 18px;
-    backdrop-filter: blur(10px);
-    box-shadow: 0 4px 20px rgba(0,0,0,0.25);
-}}
- 
-.glass {{
-    background: rgba(18,24,33,0.88);
-    border: 1px solid rgba(255,255,255,0.06);
-    border-radius: 18px;
-    padding: 22px;
-    backdrop-filter: blur(10px);
-}}
- 
-.main-title {{
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@600&display=swap');
+
+:root{--glass-bg: rgba(255,255,255,0.04); --accent: #00f7ff; --accent-2: #ff00d0;}
+
+html, body {
+    background: #071025;
+    color: #e6f7ff;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial;
+}
+
+.app-title{
     font-family: 'Orbitron', sans-serif;
-    font-size: 42px;
-    font-weight: 900;
-    color: white;
-}}
- 
-.sub-title {{
-    color: #7D8CA3;
-    margin-top: -8px;
-}}
- 
-.status-normal {{
-    background: rgba(0,210,106,0.12);
-    border: 1px solid rgba(0,210,106,0.3);
-    border-radius: 18px;
-    padding: 20px;
-}}
- 
-.status-danger {{
-    background: rgba(255,77,77,0.12);
-    border: 1px solid rgba(255,77,77,0.3);
-    border-radius: 18px;
-    padding: 20px;
-    animation: pulse 1.5s infinite;
-}}
- 
-@keyframes pulse {{
-    0% {{ box-shadow: 0 0 0 rgba(255,77,77,0.2); }}
-    50% {{ box-shadow: 0 0 30px rgba(255,77,77,0.35); }}
-    100% {{ box-shadow: 0 0 0 rgba(255,77,77,0.2); }}
-}}
- 
-.stButton button {{
-    width: 100%;
-    height: 48px;
-    border-radius: 12px;
-    border: none;
-    background: linear-gradient(90deg, {PRIMARY}, #0099ff);
-    color: black;
+    font-size: 48px;
+    text-align: center;
     font-weight: 700;
-}}
- 
+    background: linear-gradient(90deg, var(--accent-2), var(--accent));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    margin-bottom: 6px;
+}
+.glass{
+    background: var(--glass-bg);
+    border-radius: 16px;
+    padding: 18px;
+    backdrop-filter: blur(6px);
+    border: 1px solid rgba(255,255,255,0.03);
+}
+.status-card{border-radius: 18px; padding: 28px; text-align: center;}
+.status-ok{box-shadow: 0 8px 30px rgba(0,255,242,0.06); border: 1px solid rgba(0,255,242,0.06);}
+.status-alert{
+    box-shadow: 0 8px 40px rgba(255,20,85,0.08);
+    border: 1px solid rgba(255,20,85,0.12);
+    animation: pulse 1.6s infinite;
+}
+@keyframes pulse {
+    0%  {transform: translateY(0)}
+    50% {transform: translateY(-2px)}
+    100%{transform: translateY(0)}
+}
+.big-risk{font-size: 54px; font-weight: 800;}
+.small-sub{font-size: 20px; opacity: 0.8;}
+.kpi{text-align: center;}
 </style>
 """, unsafe_allow_html=True)
- 
-# ─────────────────────────────────────
-# LOAD MODEL
-# ─────────────────────────────────────
+
+# ── Model loading ──────────────────────────────────────────────────────────────
 @st.cache_resource
 def load_model():
- 
-    try:
-        model = joblib.load("machine_failure_model.pkl")
-        features = joblib.load("feature_names.pkl")
-        return model, features
- 
-    except Exception as e:
- 
-        st.warning(f"Model not loaded: {e}")
-        return None, None
- 
- 
-# ─────────────────────────────────────
-# LOAD METRICS
-# ─────────────────────────────────────
-def load_metrics():
- 
-    default = {
-        "Accuracy": "—",
-        "Precision": "—",
-        "Recall": "—",
-        "F1 Score": "—",
-        "ROC-AUC": "—"
-    }
- 
-    if os.path.exists("metrics.json"):
- 
+    """Load model and feature names if available."""
+    model = None
+    feature_names = None
+    if os.path.exists("machine_failure_model.pkl"):
         try:
- 
-            with open("metrics.json") as f:
-                data = json.load(f)
- 
-            return {
-                k: f"{v*100:.1f}%"
-                for k, v in data.items()
-            }
- 
-        except Exception:
-            return default
- 
-    return default
- 
- 
+            model = joblib.load("machine_failure_model.pkl")
+        except Exception as e:
+            st.warning(f"Could not load model: {e}")
+    if os.path.exists("feature_names.pkl"):
+        try:
+            feature_names = joblib.load("feature_names.pkl")
+        except Exception as e:
+            st.warning(f"Could not load feature names: {e}")
+    return model, feature_names
+
 model, feature_names = load_model()
-perf_metrics = load_metrics()
- 
-# ─────────────────────────────────────
-# SESSION STATE
-# ─────────────────────────────────────
-if "sim_tick" not in st.session_state:
-    st.session_state.sim_tick = 0
- 
-# ─────────────────────────────────────
-# SIDEBAR
-# ─────────────────────────────────────
-with st.sidebar:
- 
-    st.markdown("""
-    <div style='margin-bottom:20px'>
-        <div style='font-size:28px;font-weight:800;color:white'>
-            ⚙ MachineGuard
-        </div>
- 
-        <div style='color:#7D8CA3;font-size:13px'>
-            Industrial AI Monitoring System
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
- 
-    live_mode = st.toggle(
-        "Enable Live Simulation",
-        value=False
-    )
- 
-    st.subheader("Sensor Inputs")
- 
-    air_temp = st.slider(
-        "Air Temperature [K]",
-        295.0, 305.0, 298.1
-    )
- 
-    process_temp = st.slider(
-        "Process Temperature [K]",
-        305.0, 315.0, 308.6
-    )
- 
-    rot_speed = st.slider(
-        "Rotational Speed [rpm]",
-        1168, 2886, 1551
-    )
- 
-    torque = st.slider(
-        "Torque [Nm]",
-        3.8, 76.6, 42.8
-    )
- 
-    tool_wear = st.slider(
-        "Tool Wear [min]",
-        0, 253, 0
-    )
- 
-    machine_type = st.selectbox(
-        "Machine Type",
-        ["Low", "Medium", "High"]
-    )
- 
-# ─────────────────────────────────────
-# LIVE SIMULATION
-# ─────────────────────────────────────
-rng = np.random.default_rng(
-    seed=st.session_state.sim_tick
-)
- 
-if live_mode:
- 
-    st.session_state.sim_tick += 1
- 
-    sim_air = air_temp + rng.normal(0, 0.2)
-    sim_proc = process_temp + rng.normal(0, 0.3)
-    sim_rpm = rot_speed + int(rng.normal(0, 20))
-    sim_torque = torque + rng.normal(0, 1.2)
-    sim_wear = tool_wear
- 
-else:
- 
-    sim_air = air_temp
-    sim_proc = process_temp
-    sim_rpm = rot_speed
-    sim_torque = torque
-    sim_wear = tool_wear
- 
-# ─────────────────────────────────────
-# FEATURE ENGINEERING
-# ─────────────────────────────────────
-type_map = {
-    "Low": {"Type_H":0,"Type_L":1,"Type_M":0},
-    "Medium": {"Type_H":0,"Type_L":0,"Type_M":1},
-    "High": {"Type_H":1,"Type_L":0,"Type_M":0}
-}
- 
-data = pd.DataFrame([{
-    "Air temperature [K]": sim_air,
-    "Process temperature [K]": sim_proc,
-    "Rotational speed [rpm]": sim_rpm,
-    "Torque [Nm]": sim_torque,
-    "Tool wear [min]": sim_wear,
-    **type_map[machine_type]
-}])
- 
-if feature_names is not None:
- 
-    for col in feature_names:
- 
-        if col not in data.columns:
-            data[col] = 0
- 
-    data = data[feature_names]
- 
-# ─────────────────────────────────────
-# PREDICTION
-# ─────────────────────────────────────
-if model is not None:
- 
-    prob = float(
-        model.predict_proba(data)[0][1]
-    )
- 
-    prediction = int(
-        model.predict(data)[0]
-    )
- 
-else:
- 
-    risk = (
-        (sim_torque / 76.6) * 0.30 +
-        (sim_wear / 253) * 0.40 +
-        ((sim_proc - sim_air) / 15) * 0.30
-    )
- 
-    prob = min(max(risk, 0.05), 0.95)
-    prediction = 1 if prob > 0.5 else 0
- 
-# ─────────────────────────────────────
-# HEADER
-# ─────────────────────────────────────
-left, right = st.columns([4,1])
- 
+
+# ── Title ──────────────────────────────────────────────────────────────────────
+st.markdown('<div class="app-title">AI Predictive Maintenance System</div>', unsafe_allow_html=True)
+st.markdown("---")
+
+# ── Query-param forced alert (for screenshots / testing) ──────────────────────
+# FIX: st.experimental_get_query_params() removed in Streamlit ≥1.34 → use st.query_params
+try:
+    qparams = st.query_params
+    if qparams.get("force_alert") in ("1", "true", "True"):
+        st.session_state.last_risk = 0.92
+        st.session_state.last_status = "CRITICAL FAILURE"
+except Exception:
+    pass
+
+# ── Status Card ────────────────────────────────────────────────────────────────
+status_col1, status_col2, status_col3 = st.columns([1, 2, 1])
+with status_col2:
+    risk_pct   = st.session_state.get("last_risk", 0.12)
+    status_text = st.session_state.get("last_status", "SYSTEM STABLE")
+    status_class = "status-alert" if isinstance(risk_pct, float) and risk_pct > 0.5 else "status-ok"
+
+    st.markdown(f'<div class="glass status-card {status_class}">', unsafe_allow_html=True)
+    st.markdown(f"<div class='big-risk'>{status_text}</div>", unsafe_allow_html=True)
+    st.markdown(f"<div class='small-sub'>Failure Risk: <strong>{int(risk_pct * 100)}%</strong></div>", unsafe_allow_html=True)
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ── KPI Cards ──────────────────────────────────────────────────────────────────
+k1, k2, k3, k4 = st.columns(4)
+last_prob     = st.session_state.get("last_risk", 0.12)
+ai_conf       = int((1 - abs(0.5 - last_prob)) * 100)
+system_health = max(0, 100 - int(last_prob * 100))
+sensor_load   = st.session_state.get("sensor_load", 27)
+risk_level    = "Low" if last_prob < 0.25 else ("Medium" if last_prob < 0.5 else "High")
+
+k1.metric("System Health", f"{system_health}%")
+k2.metric("AI Confidence", f"{ai_conf}%")
+k3.metric("Sensor Load",   f"{sensor_load}%")
+k4.metric("Risk Level",    risk_level)
+
+st.markdown("---")
+
+# ── Main Area ──────────────────────────────────────────────────────────────────
+left, right = st.columns([3, 1])
+
 with left:
- 
-    st.markdown("""
-    <div class='main-title'>
-        ⚙ MachineGuard AI
-    </div>
- 
-    <div class='sub-title'>
-        Real-Time Predictive Maintenance & Industrial Anomaly Detection Platform
-    </div>
-    """, unsafe_allow_html=True)
- 
+    st.markdown('<div class="glass">', unsafe_allow_html=True)
+    st.subheader("Live Sensor Graph")
+    chart_placeholder = st.empty()
+
+    if "chart_data" not in st.session_state:
+        st.session_state.chart_data = pd.DataFrame({"value": np.zeros(40)})
+
+    chart_placeholder.line_chart(st.session_state.chart_data)
+    st.markdown('</div>', unsafe_allow_html=True)
+
 with right:
- 
-    status = (
-        "Operational"
-        if prediction == 0
-        else "Failure Risk"
+    st.markdown('<div class="glass">', unsafe_allow_html=True)
+    st.subheader("Input Controls")
+
+    # Force-alert toggle for previewing alert state
+    force_alert = st.checkbox("Force Alert (preview)", value=False)
+    if force_alert:
+        st.session_state.last_risk   = 0.92
+        st.session_state.last_status = "CRITICAL FAILURE"
+
+    with st.expander("Sensor Inputs (compact)"):
+        cols = st.columns(2)
+        footfall    = cols[0].slider("Footfall",    0, 100, int(st.session_state.get("footfall",    30)))
+        temperature = cols[1].slider("Temperature", 0, 150, int(st.session_state.get("temperature", 60)))
+        vibration   = cols[0].slider("Vibration",   0, 100, int(st.session_state.get("vibration",   20)))
+        load        = cols[1].slider("Load",        0, 100, int(st.session_state.get("load",        25)))
+
+        # FIX: expose previously-hidden features so the model gets real inputs.
+        # These replace the four hardcoded zeros in the original code.
+        AQ          = st.number_input("Air Quality (AQ)",       min_value=0,   max_value=500, value=int(st.session_state.get("AQ",         100)))
+        rpm         = st.number_input("RPM",                    min_value=0,   max_value=5000, value=int(st.session_state.get("rpm",       1500)))
+        pressure    = st.number_input("Pressure (bar)",         min_value=0,   max_value=200, value=int(st.session_state.get("pressure",    50)))
+        humidity    = st.number_input("Humidity (%)",           min_value=0,   max_value=100, value=int(st.session_state.get("humidity",    45)))
+        power       = st.number_input("Power draw (kW)",        min_value=0.0, max_value=500.0, value=float(st.session_state.get("power",  10.0)))
+
+    # Persist to session state
+    for k, v in dict(footfall=footfall, temperature=temperature, vibration=vibration,
+                     load=load, AQ=AQ, rpm=rpm, pressure=pressure,
+                     humidity=humidity, power=power).items():
+        st.session_state[k] = v
+
+    # FIX: live-update is done one step at a time via rerun, not a blocking sleep loop.
+    # Buttons toggle a flag; a single step happens each rerun while active.
+    col_start, col_stop = st.columns(2)
+    start_live = col_start.button("▶ Start Live")
+    stop_live  = col_stop.button("■ Stop")
+    run_scan   = st.button("⚡ INITIATE AI SCAN", use_container_width=True)
+
+    if start_live:
+        st.session_state.updating = True
+    if stop_live:
+        st.session_state.updating = False
+
+    st.markdown('</div>', unsafe_allow_html=True)
+
+# ── Non-blocking live update (one step per rerun) ─────────────────────────────
+if st.session_state.get("updating", False):
+    current = st.session_state.chart_data["value"].iloc[-1]
+    new_val = float(np.clip(
+        np.random.normal(loc=0.2 * (st.session_state.get("load", 25) / 25), scale=0.5),
+        -3, 3
+    )) + current
+
+    st.session_state.chart_data = pd.concat(
+        [st.session_state.chart_data.iloc[1:], pd.DataFrame({"value": [new_val]})],
+        ignore_index=True
     )
- 
-    color = (
-        SUCCESS
-        if prediction == 0
-        else DANGER
-    )
- 
-    st.markdown(f"""
-    <div class='glass' style='text-align:center'>
-        <div style='font-size:12px;color:#7D8CA3'>
-            Machine Status
-        </div>
- 
-        <div style='font-size:24px;
-                    color:{color};
-                    font-weight:700'>
-            {status}
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
- 
-st.markdown("<br>", unsafe_allow_html=True)
- 
-# ─────────────────────────────────────
-# KPI ROW
-# ─────────────────────────────────────
-c1,c2,c3,c4,c5 = st.columns(5)
- 
-metrics = [
-    ("Failure Risk", f"{prob*100:.1f}%"),
-    ("System Health", f"{100-int(prob*100)}%"),
-    ("Tool Wear", f"{sim_wear} min"),
-    ("Temperature Delta", f"{sim_proc-sim_air:.1f} K"),
-    ("Machine Speed", f"{sim_rpm} rpm")
-]
- 
-for col, (title, value) in zip(
-    [c1,c2,c3,c4,c5],
-    metrics
-):
- 
-    with col:
- 
-        st.markdown(f"""
-        <div class='metric-card'>
-            <div style='color:#7D8CA3;font-size:13px'>
-                {title}
-            </div>
- 
-            <div style='font-size:30px;
-                        color:white;
-                        font-weight:700'>
-                {value}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
- 
-st.markdown("<br>", unsafe_allow_html=True)
- 
-# ─────────────────────────────────────
-# STATUS ALERT
-# ─────────────────────────────────────
-if prediction == 0:
- 
-    st.markdown(f"""
-    <div class='status-normal'>
-        <div style='font-size:24px;
-                    color:{SUCCESS};
-                    font-weight:700'>
-            ✅ Predictive Maintenance Status: Stable
-        </div>
- 
-        <div style='margin-top:8px;color:#9FB2C7'>
-            AI monitoring indicates all operational parameters are
-            within expected industrial thresholds.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
- 
-else:
- 
-    st.markdown(f"""
-    <div class='status-danger'>
-        <div style='font-size:24px;
-                    color:{DANGER};
-                    font-weight:700'>
-            🚨 Industrial Anomaly Detected
-        </div>
- 
-        <div style='margin-top:8px;color:#9FB2C7'>
-            Sensor telemetry suggests elevated machine failure probability.
-            Preventive maintenance intervention recommended immediately.
-        </div>
-    </div>
-    """, unsafe_allow_html=True)
- 
-st.markdown("<br>", unsafe_allow_html=True)
- 
-# ─────────────────────────────────────
-# MAIN CHARTS
-# ─────────────────────────────────────
-g1, g2 = st.columns([1,1])
- 
-with g1:
- 
-    st.markdown("### Live Failure Risk Gauge")
- 
-    gauge = go.Figure(go.Indicator(
-        mode="gauge+number",
-        value=prob*100,
- 
-        number={
-            "suffix":"%",
-            "font":{
-                "size":42,
-                "color":"white"
-            }
-        },
- 
-        gauge={
-            "axis":{"range":[0,100]},
-            "bar":{"color":PRIMARY},
- 
-            "steps":[
-                {
-                    "range":[0,35],
-                    "color":"rgba(0,210,106,0.35)"
-                },
-                {
-                    "range":[35,70],
-                    "color":"rgba(255,140,66,0.35)"
-                },
-                {
-                    "range":[70,100],
-                    "color":"rgba(255,77,77,0.35)"
-                }
-            ],
- 
-            "bgcolor":CARD
-        }
-    ))
- 
-    gauge.update_layout(
-        paper_bgcolor=BG,
-        font={"color":"white"},
-        height=360
-    )
- 
-    st.plotly_chart(
-        gauge,
-        width="stretch"
-    )
- 
-with g2:
- 
-    st.markdown("### Model Feature Importance")
- 
-    if model is not None and hasattr(model, "feature_importances_"):
- 
-        importance = pd.DataFrame({
-            "Feature": feature_names,
-            "Importance": model.feature_importances_
-        })
- 
-        importance = importance.sort_values(
-            by="Importance",
-            ascending=True
-        )
- 
-        fig = px.bar(
-            importance.tail(8),
-            x="Importance",
-            y="Feature",
-            orientation='h',
-            color="Importance",
-            color_continuous_scale=[
-                [0, "#0099ff"],
-                [1, PRIMARY]
-            ]
-        )
- 
-        fig.update_layout(
-            paper_bgcolor=BG,
-            plot_bgcolor=BG,
-            font_color="white",
-            height=360,
-            coloraxis_showscale=False
-        )
- 
-        st.plotly_chart(
-            fig,
-            width="stretch"
-        )
- 
-st.markdown("<br>", unsafe_allow_html=True)
- 
-# ─────────────────────────────────────
-# MODEL METRICS
-# ─────────────────────────────────────
-st.markdown("### Model Performance Metrics")
- 
-if "—" in perf_metrics.values():
- 
-    st.caption("""
-⚠️ metrics.json not found — run python save_metrics.py
-after training to display real computed values here.
-""")
- 
-m1,m2,m3,m4,m5 = st.columns(5)
- 
-for col, (name, value) in zip(
-    [m1,m2,m3,m4,m5],
-    perf_metrics.items()
-):
- 
-    with col:
- 
-        st.markdown(f"""
-        <div class='metric-card'>
-            <div style='color:#7D8CA3;font-size:13px'>
-                {name}
-            </div>
- 
-            <div style='font-size:28px;
-                        color:{PRIMARY};
-                        font-weight:700'>
-                {value}
-            </div>
-        </div>
-        """, unsafe_allow_html=True)
- 
-st.markdown("<br>", unsafe_allow_html=True)
- 
-# ─────────────────────────────────────
-# LIVE TELEMETRY
-# ─────────────────────────────────────
-st.markdown("### Live Industrial Telemetry")
- 
-telemetry = pd.DataFrame({
- 
-    "Sensor":[
-        "Air Temperature",
-        "Process Temperature",
-        "Rotational Speed",
-        "Torque",
-        "Tool Wear"
-    ],
- 
-    "Current Reading":[
-        f"{sim_air:.1f} K",
-        f"{sim_proc:.1f} K",
-        f"{sim_rpm} rpm",
-        f"{sim_torque:.1f} Nm",
-        f"{sim_wear} min"
-    ],
- 
-    "Status":[
-        "Stable",
-        "Monitoring",
-        "Operational",
-        "Analyzing",
-        "Healthy"
+    chart_placeholder.line_chart(st.session_state.chart_data)
+    st.session_state.sensor_load = int(np.clip(abs(new_val) * 10, 5, 95))
+
+    # FIX: use st.rerun() — st.experimental_rerun() removed in Streamlit ≥1.34
+    st.rerun()
+
+# ── AI Scan ────────────────────────────────────────────────────────────────────
+if run_scan:
+    # FIX: all 9 features now populated from real user inputs (no more hardcoded zeros).
+    # Order: footfall, vibration, AQ, load, rpm, pressure, humidity, power, temperature
+    # If feature_names.pkl is available, we validate the expected count.
+    feature_values = [
+        st.session_state.get("footfall",    30),
+        st.session_state.get("vibration",   20),
+        st.session_state.get("AQ",         100),
+        st.session_state.get("load",        25),
+        st.session_state.get("rpm",       1500),
+        st.session_state.get("pressure",    50),
+        st.session_state.get("humidity",    45),
+        st.session_state.get("power",     10.0),
+        st.session_state.get("temperature", 60),
     ]
-})
- 
-st.dataframe(
-    telemetry,
-    width="stretch",
-    hide_index=True
-)
- 
-# ─────────────────────────────────────
-# AI INSIGHTS
-# ─────────────────────────────────────
-st.markdown("### 🤖 AI Failure Explanation")
- 
-explanations = []
- 
-if sim_torque > 55:
- 
-    explanations.append(
-        "Elevated torque load indicates abnormal mechanical stress."
-    )
- 
-if sim_wear > 180:
- 
-    explanations.append(
-        "Tool wear approaching maintenance threshold."
-    )
- 
-if sim_proc - sim_air > 10:
- 
-    explanations.append(
-        "Thermal differential anomaly detected between process and air temperatures."
-    )
- 
-if sim_rpm < 1300:
- 
-    explanations.append(
-        "Rotational instability may affect operational efficiency."
-    )
- 
-if prediction == 1:
- 
-    explanations.append(
-        "Machine learning model predicts increasing probability of component degradation."
-    )
- 
-if not explanations:
- 
-    explanations.append(
-        "AI diagnostics indicate stable operational performance across all monitored parameters."
-    )
- 
-for item in explanations:
- 
-    st.markdown(f"""
-    <div class='glass'
-         style='margin-bottom:12px'>
-        {item}
-    </div>
-    """, unsafe_allow_html=True)
- 
-# ─────────────────────────────────────
-# SYSTEM ARCHITECTURE
-# ─────────────────────────────────────
-st.markdown("### System Architecture")
- 
-nodes = [
-    "IoT Sensors",
-    "Preprocessing",
-    "Feature Engineering",
-    "Random Forest",
-    "Prediction Engine",
-    "Dashboard"
-]
- 
-colors = [
-    "#00E0FF",
-    "#0099ff",
-    "#4477ff",
-    "#7744ff",
-    "#ff4477",
-    "#00D26A"
-]
- 
-sankey = go.Figure(go.Sankey(
- 
-    arrangement="snap",
- 
-    node=dict(
-        pad=20,
-        thickness=24,
- 
-        line=dict(
-            color="rgba(255,255,255,0.1)",
-            width=0.5
-        ),
- 
-        label=nodes,
-        color=colors
-    ),
- 
-    link=dict(
-        source=[0,1,2,3,4],
-        target=[1,2,3,4,5],
-        value=[8,8,8,8,8]
-    )
-))
- 
-sankey.update_layout(
-    paper_bgcolor=BG,
-    font=dict(
-        color="white",
-        size=14
-    ),
-    height=320
-)
- 
-st.plotly_chart(
-    sankey,
-    width="stretch"
-)
- 
-# ─────────────────────────────────────
-# ADVANCED ANALYTICS
-# ─────────────────────────────────────
-with st.expander("Advanced Analytics"):
- 
-    for img in [
-        "feature_importance.png",
-        "correlation_heatmap.png",
-        "sensor_histograms.png"
-    ]:
- 
-        if os.path.exists(img):
- 
-            st.image(
-                img,
-                width="stretch"
-            )
- 
+
+    if feature_names is not None and len(feature_names) != len(feature_values):
+        st.error(
+            f"Feature mismatch: model expects {len(feature_names)} features "
+            f"but {len(feature_values)} were provided. "
+            f"Expected: {list(feature_names)}"
+        )
+    else:
+        features = np.array([feature_values])
+
+        if model is not None:
+            pred = model.predict(features)[0]
+            prob = float(model.predict_proba(features)[0][1])
         else:
- 
-            st.caption(
-                f"{img} not found — generate from training notebook."
-            )
- 
-# ─────────────────────────────────────
-# FOOTER
-# ─────────────────────────────────────
-st.markdown("<br><br>", unsafe_allow_html=True)
- 
-st.markdown(f"""
-<hr style='border:1px solid rgba(255,255,255,0.06)'>
- 
-<div style='display:flex;
-            justify-content:space-between;
-            color:#7D8CA3;
-            font-size:13px'>
- 
-<div>
-MachineGuard AI • Industrial Predictive Maintenance • Random Forest Classifier
-</div>
- 
-<div>
-<a href='https://github.com/Sneh-04/Machine_Failure_Prediction'
-style='color:{PRIMARY};text-decoration:none'>
-GitHub
-</a>
-</div>
- 
-</div>
-""", unsafe_allow_html=True)
- 
+            pred = 0
+            prob = float(np.clip(np.random.beta(2, 18), 0.01, 0.95))
+
+        st.session_state.last_risk   = prob
+        st.session_state.last_status = "CRITICAL FAILURE" if prob > 0.5 else "SYSTEM STABLE"
+
+        if pred == 1 or prob > 0.5:
+            st.markdown('<div class="glass status-card status-alert">', unsafe_allow_html=True)
+            st.markdown("<h2 style='text-align:center;color:#ff6aa6'>🚨 CRITICAL FAILURE IMMINENT</h2>",
+                        unsafe_allow_html=True)
+            # FIX: missing space between <p and style= fixed
+            st.markdown(f"<p style='text-align:center;'>Failure Probability: <strong>{prob*100:.2f}%</strong></p>",
+                        unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+        else:
+            st.markdown('<div class="glass status-card status-ok">', unsafe_allow_html=True)
+            st.markdown("<h2 style='text-align:center;color:#7fffd4'>✅ SYSTEM STABLE</h2>",
+                        unsafe_allow_html=True)
+            st.markdown(f"<p style='text-align:center;'>Failure Probability: <strong>{prob*100:.2f}%</strong></p>",
+                        unsafe_allow_html=True)
+            st.markdown('</div>', unsafe_allow_html=True)
+
+        # FIX: use st.rerun() — st.experimental_rerun() removed in Streamlit ≥1.34
+        st.rerun()
