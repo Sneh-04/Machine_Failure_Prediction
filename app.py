@@ -748,6 +748,7 @@ with st.expander("Advanced Analytics"):
 # ─────────────────────────────────────
 st.markdown("<br><br>", unsafe_allow_html=True)
 
+
 st.markdown(f"""
 <hr style='border:1px solid rgba(255,255,255,0.06)'>
 
@@ -768,4 +769,4 @@ GitHub
 </div>
 
 </div>
-""", unsafe_allow_html=True)
+""", unsafe_allow_html=True) 
